@@ -1,7 +1,6 @@
 package compute
 
 import (
-	"context"
 	"errors"
 
 	"go.uber.org/zap"
@@ -20,7 +19,7 @@ var (
 )
 
 type Analyzer struct {
-	handlers []func(context.Context, Query) error
+	handlers []func(Query) error
 	logger   *zap.Logger
 }
 
@@ -33,7 +32,7 @@ func NewAnalyzer(logger *zap.Logger) (*Analyzer, error) {
 		logger: logger,
 	}
 
-	analyser.handlers = []func(context.Context, Query) error{
+	analyser.handlers = []func(Query) error{
 		SetCommandID: analyser.analyzeSetQuery,
 		GetCommandID: analyser.analyzeGetQuery,
 		DelCommandID: analyser.analyzeDelQuery,
@@ -42,20 +41,17 @@ func NewAnalyzer(logger *zap.Logger) (*Analyzer, error) {
 	return analyser, nil
 }
 
-func (a *Analyzer) AnalyzeQuery(ctx context.Context, tokens []string) (Query, error) {
+func (a *Analyzer) AnalyzeQuery(tokens []string) (Query, error) {
 	if len(tokens) == 0 {
-		txID := ctx.Value("tx").(int64)
-		a.logger.Debug("invalid query", zap.Int64("tx", txID))
+		a.logger.Debug("invalid query")
 		return Query{}, errInvalidCommand
 	}
 
 	command := tokens[0]
 	commandID := CommandNameToCommandID(command)
 	if commandID == UnknownCommandID {
-		txID := ctx.Value("tx").(int64)
 		a.logger.Debug(
 			"invalid command",
-			zap.Int64("tx", txID),
 			zap.String("command", command),
 		)
 		return Query{}, errInvalidCommand
@@ -63,26 +59,22 @@ func (a *Analyzer) AnalyzeQuery(ctx context.Context, tokens []string) (Query, er
 
 	query := NewQuery(commandID, tokens[1:])
 	handler := a.handlers[commandID]
-	if err := handler(ctx, query); err != nil {
+	if err := handler(query); err != nil {
 		return Query{}, err
 	}
 
-	txID := ctx.Value("tx").(int64)
 	a.logger.Debug(
 		"query analyzed",
-		zap.Int64("tx", txID),
 		zap.Any("query", query),
 	)
 
 	return query, nil
 }
 
-func (a *Analyzer) analyzeSetQuery(ctx context.Context, query Query) error {
+func (a *Analyzer) analyzeSetQuery(query Query) error {
 	if len(query.Arguments()) != setQueryArgumentsNumber {
-		txID := ctx.Value("tx").(int64)
 		a.logger.Debug(
 			"invalid arguments for set query",
-			zap.Int64("tx", txID),
 			zap.Any("args", query.Arguments()),
 		)
 		return errInvalidArguments
@@ -91,12 +83,10 @@ func (a *Analyzer) analyzeSetQuery(ctx context.Context, query Query) error {
 	return nil
 }
 
-func (a *Analyzer) analyzeGetQuery(ctx context.Context, query Query) error {
+func (a *Analyzer) analyzeGetQuery(query Query) error {
 	if len(query.Arguments()) != getQueryArgumentsNumber {
-		txID := ctx.Value("tx").(int64)
 		a.logger.Debug(
 			"invalid arguments for get query",
-			zap.Int64("tx", txID),
 			zap.Any("args", query.Arguments()),
 		)
 		return errInvalidArguments
@@ -105,12 +95,10 @@ func (a *Analyzer) analyzeGetQuery(ctx context.Context, query Query) error {
 	return nil
 }
 
-func (a *Analyzer) analyzeDelQuery(ctx context.Context, query Query) error {
+func (a *Analyzer) analyzeDelQuery(query Query) error {
 	if len(query.Arguments()) != delQueryArgumentsNumber {
-		txID := ctx.Value("tx").(int64)
 		a.logger.Debug(
 			"invalid arguments for del query",
-			zap.Int64("tx", txID),
 			zap.Any("args", query.Arguments()),
 		)
 		return errInvalidArguments

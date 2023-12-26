@@ -23,7 +23,6 @@ type storageLayer interface {
 type Database struct {
 	computeLayer computeLayer
 	storageLayer storageLayer
-	idGenerator  *IDGenerator
 	logger       *zap.Logger
 }
 
@@ -43,18 +42,13 @@ func NewDatabase(computeLayer computeLayer, storageLayer storageLayer, logger *z
 	return &Database{
 		computeLayer: computeLayer,
 		storageLayer: storageLayer,
-		idGenerator:  NewIDGenerator(),
 		logger:       logger,
 	}, nil
 }
 
 func (d *Database) HandleQuery(ctx context.Context, queryStr string) string {
-	txID := d.idGenerator.Generate()
-	ctx = context.WithValue(ctx, "tx", txID)
-
 	d.logger.Debug(
 		"handling query",
-		zap.Int64("tx", txID),
 		zap.String("query", queryStr),
 	)
 
@@ -72,7 +66,7 @@ func (d *Database) HandleQuery(ctx context.Context, queryStr string) string {
 		return d.handleDelQuery(ctx, query)
 	}
 
-	d.logger.Error("compute layer is incorrect", zap.Int64("tx", txID))
+	d.logger.Error("compute layer is incorrect")
 	return "[error] internal configuration error"
 }
 

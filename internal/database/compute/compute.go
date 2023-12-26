@@ -8,11 +8,11 @@ import (
 )
 
 type parser interface {
-	ParseQuery(context.Context, string) ([]string, error)
+	ParseQuery(string) ([]string, error)
 }
 
 type analyzer interface {
-	AnalyzeQuery(context.Context, []string) (Query, error)
+	AnalyzeQuery([]string) (Query, error)
 }
 
 type Compute struct {
@@ -43,17 +43,16 @@ func NewCompute(parser parser, analyzer analyzer, logger *zap.Logger) (*Compute,
 
 func (d *Compute) HandleQuery(ctx context.Context, queryStr string) (Query, error) {
 	if ctx.Err() != nil {
-		txID := ctx.Value("tx").(int64)
-		d.logger.Debug("query canceled", zap.Int64("tx", txID))
+		d.logger.Debug("query canceled")
 		return Query{}, ctx.Err()
 	}
 
-	tokens, err := d.parser.ParseQuery(ctx, queryStr)
+	tokens, err := d.parser.ParseQuery(queryStr)
 	if err != nil {
 		return Query{}, err
 	}
 
-	query, err := d.analyzer.AnalyzeQuery(ctx, tokens)
+	query, err := d.analyzer.AnalyzeQuery(tokens)
 	if err != nil {
 		return Query{}, err
 	}

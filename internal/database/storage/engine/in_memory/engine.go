@@ -1,9 +1,7 @@
 package in_memory
 
 import (
-	"context"
 	"errors"
-	"hash/fnv"
 
 	"go.uber.org/zap"
 )
@@ -15,68 +13,37 @@ type hashTable interface {
 }
 
 type Engine struct {
-	partitions []hashTable
-	logger     *zap.Logger
+	logger *zap.Logger
+	table  hashTable
 }
 
-func NewEngine(tableBuilder func() hashTable, partitionsNumber int, logger *zap.Logger) (*Engine, error) {
+func NewEngine(tableBuilder func() hashTable, logger *zap.Logger) (*Engine, error) {
 	if tableBuilder == nil {
 		return nil, errors.New("hash table builder is invalid")
-	}
-
-	if partitionsNumber <= 0 {
-		return nil, errors.New("partitions number is invalid")
 	}
 
 	if logger == nil {
 		return nil, errors.New("logger is invalid")
 	}
 
-	partitions := make([]hashTable, partitionsNumber)
-	for i := 0; i < partitionsNumber; i++ {
-		if partition := tableBuilder(); partition != nil {
-			partitions[i] = partition
-		} else {
-			return nil, errors.New("hash table partition is invalid")
-		}
-	}
-
 	return &Engine{
-		partitions: partitions,
-		logger:     logger,
+		logger: logger,
+		table:  tableBuilder(),
 	}, nil
 }
 
-func (e *Engine) Set(ctx context.Context, key, value string) {
-	idx := e.partitionIdx(key)
-	partition := e.partitions[idx]
-	partition.Set(key, value)
-
-	txID := ctx.Value("tx").(int64)
-	e.logger.Debug("success set query", zap.Int64("tx", txID))
+func (e *Engine) Set(key, value string) {
+	e.table.Set(key, value)
+	e.logger.Debug("success set query")
 }
 
-func (e *Engine) Get(ctx context.Context, key string) (string, bool) {
-	idx := e.partitionIdx(key)
-	partition := e.partitions[idx]
-	value, found := partition.Get(key)
-
-	txID := ctx.Value("tx").(int64)
-	e.logger.Debug("success get query", zap.Int64("tx", txID))
+func (e *Engine) Get(key string) (string, bool) {
+	value, found := e.table.Get(key)
+	e.logger.Debug("success get query")
 	return value, found
 }
 
-func (e *Engine) Del(ctx context.Context, key string) {
-	idx := e.partitionIdx(key)
-	partition := e.partitions[idx]
-	partition.Del(key)
-
-	txID := ctx.Value("tx").(int64)
-	e.logger.Debug("success del query", zap.Int64("tx", txID))
-}
-
-func (e *Engine) partitionIdx(key string) int {
-	hash := fnv.New32a()
-	_, _ = hash.Write([]byte(key))
-	return int(hash.Sum32()) % len(e.partitions)
+func (e *Engine) Del(key string) {
+	e.table.Del(key)
+	e.logger.Debug("success del query")
 }

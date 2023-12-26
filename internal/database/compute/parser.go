@@ -1,7 +1,6 @@
 package compute
 
 import (
-	"context"
 	"errors"
 
 	"go.uber.org/zap"
@@ -21,17 +20,15 @@ func NewParser(logger *zap.Logger) (*Parser, error) {
 	}, nil
 }
 
-func (p *Parser) ParseQuery(ctx context.Context, query string) ([]string, error) {
+func (p *Parser) ParseQuery(query string) ([]string, error) {
 	machine := newStateMachine()
 	tokens, err := machine.parse(query)
 	if err != nil {
 		return nil, err
 	}
 
-	txID := ctx.Value("tx").(int64)
 	p.logger.Debug(
 		"query parsed",
-		zap.Int64("tx", txID),
 		zap.Any("tokens", tokens),
 	)
 
